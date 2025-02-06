@@ -327,6 +327,11 @@ if ($Uninstall) {
     IsAppInstalled "MSTeams"
     Log "$EXE version is $($EXEinfo.VersionInfo.ProductVersion)"
 
+$shortcutPath = "C:\Users\Public\Desktop\New Teams.lnk"
+	if (Test-Path $shortcutPath) {
+	    Remove-Item $shortcutPath -Force
+	}
+
     $result = Uninstall-MSTeams
     $Appx = Get-AppxPackage -AllUsers | Where-Object {$PSItem. Name -eq "MSTeams"}
     $ProvApp = Get-ProvisionedAppPackage -Online | Where-Object {$PSItem. DisplayName -eq "MSTeams"}
