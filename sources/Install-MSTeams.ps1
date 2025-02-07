@@ -1,13 +1,15 @@
-<#
+.<#
 .NOTES
 Author:     Sassan Fanai
 Date:       2023-11-22
 Version:    1.0.3.2 - Added -DownloadExe parameter that attempts to download Teamsbootstrapper.exe from Microsoft, removing the need of any local other local files.
-                      Functions used for download and verification were stolen with pride from @JankeSkanke and MSEndpointMgr @ https://github.com/MSEndpointMgr/M365Apps. Thank you !
+                      Functions used for download and verification were stolen with pride from @JankeSkanke and MSEndpointMgr @ https://github.com/MSEndpointMgr/M365Apps. Thank you!
 
-Edit by:    Autistik barn
-Date :      02/04/2025
-
+Install command example:    %windir%\Sysnative\WindowsPowerShell\v1.0\PowerShell.exe -ExecutionPolicy Bypass -NoLogo -NonInteractive -NoProfile -WindowStyle Hidden -File ".\Install-MSTeams.ps1" -Offline -ForceInstall
+Detection script example 1: if ("MSTeams" -in (Get-ProvisionedAppPackage -Online).DisplayName) { Write-Output "Installed" }
+Detection script example 2: $MinVersion = "23285.3604.2469.4152"
+                            $MSTeams = Get-ProvisionedAppPackage -Online |  Where-Object {$PSitem.DisplayName -like "MSTeams"}
+                            if ($MSTeams.version -ge [version]$MinVersion ) { Write-Output "Installed" }
 #>
 [CmdletBinding()]
 param (
@@ -156,6 +158,7 @@ function Install-MSTeams {
 function Uninstall-MSTeams {
     Log "Running Uninstall-MSTeams function" -NoOutput
     $Appx = Get-AppxPackage -AllUsers | Where-Object {$PSItem.Name -eq "MSTeams"}
+	
     if ($Appx) {
         Log "MSTeams $($Appx.Version) package is installed for these users: $($Appx.PackageUserInformation.UserSecurityId.UserName)" -NoOutput
         Log "Uninstalling AppxPackage for AllUsers" -NoOutput
@@ -306,11 +309,16 @@ if ($DownloadExe) {
 }
 
 if ($Teamslnk) {
-    	$AppLink = "MSTeams_8wekyb3d8bbwe!MSTeams"
+    	$ScriptPath = $PSScriptRoot
+	$AppLink = "C:\Windows\System32\cmd.exe"
+	$Arguments = "/c start C:\Users\%USERNAME%\Appdata\Local\Microsoft\WindowsApps\ms-teams.exe"
 	$WScriptShell = New-Object -ComObject WScript.Shell
-	$Shortcut = $WScriptShell.CreateShortcut("C:\Users\Public\Desktop\Teams.lnk")
-	$Shortcut.Arguments="shell:AppsFolder\$AppLink"
-	$Shortcut.TargetPath = "shell:AppsFolder\$AppLink"
+	$ShortcutPath = "C:\Users\Public\Desktop\New Teams.lnk"
+	$Shortcut = $WScriptShell.CreateShortCut($ShortcutPath)
+	$IconPath = "$ScriptPath\teams-icon-256x256.ico"
+	$Shortcut.TargetPath = $AppLink
+	$Shortcut.Arguments = $Arguments
+	$Shortcut.IconLocation = $IconPath
 	$Shortcut.Save()
 }
 
@@ -324,12 +332,24 @@ $EXEinfo = Get-ChildItem -Path "$EXEFolder\$EXE"
 if ($Uninstall) {
     $LogFile = $LogFile.Replace("Install","Uninstall")
     Log "Attempting to uninstall MSTeams"
+
+$shortcutPath = "C:\Users\Public\Desktop\New Teams.lnk"
+if (Test-Path $shortcutPath) {
+    Remove-Item $shortcutPath -Force
+}
+
     IsAppInstalled "MSTeams"
     Log "$EXE version is $($EXEinfo.VersionInfo.ProductVersion)"
 
-$shortcutPath = "C:\Users\Public\Desktop\New Teams.lnk"
-	if (Test-Path $shortcutPath) {
-	    Remove-Item $shortcutPath -Force
+$Appx = Get-AppxPackage -AllUsers | Where-Object {$PSItem.Name -eq "MSTeams"}
+	$WScript = New-Object -ComObject WScript.Shell
+	$ShortcutsToDelete = Get-ChildItem -Path "C:\Users\Public\Desktop" -Filter "*.lnk" | 
+		ForEach-Object { 
+			$WScript.CreateShortcut($_.FullName) | 
+				Where-Object TargetPath -eq 'C:\Users\%USERNAME%\Appdata\Local\Microsoft\WindowsApps\ms-teams.exe'
+		}
+	$ShortcutsToDelete | ForEach-Object {
+		Remove-Item -Path $_.FullName
 	}
 
     $result = Uninstall-MSTeams
